@@ -1,0 +1,273 @@
+import time
+from tkinter import *
+import random
+
+game_width = 650
+game_height = 550
+space_size = 50
+
+food_color = "red"
+snake_color = "#4bed2b"
+background_color = "black"
+
+games_played = 1
+speed = 75
+body_parts = 3
+score = 0
+high_score = 0
+last_change_time = 0
+current_direction = "down"
+
+
+class Snake:
+    def __init__(self):
+        self.body_size = body_parts
+        self.coordinates = []
+        self.squares = []
+
+        for i in range(0, body_parts):
+            self.coordinates.append([0, 0])
+
+        for x, y in self.coordinates:
+            square = play_canvas.create_rectangle(x, y, x + space_size, y + space_size,
+                                                  fill=snake_color, tags="snake")
+            self.squares.append(square)
+
+
+class Food:
+    def __init__(self, snake):
+        x = random.randint(0, (game_width // space_size) - 1) * space_size
+        y = random.randint(0, (game_height // space_size) - 1) * space_size
+        self.coordinates = (x, y)
+        coords = set(tuple(coord) for coord in snake.coordinates)
+
+        while self.coordinates in coords:
+            x = random.randint(0, (game_width // space_size) - 1) * space_size
+            y = random.randint(0, (game_height // space_size) - 1) * space_size
+            self.coordinates = (x, y)
+
+        play_canvas.create_oval(x, y, x + space_size, y + space_size,
+                                fill=food_color, tags="food")
+
+
+def next_turn(snake, food):
+    global current_direction, high_score
+
+    x, y = snake.coordinates[0]
+    if current_direction == "up":
+        y -= space_size
+    elif current_direction == "down":
+        y += space_size
+    elif current_direction == "right":
+        x += space_size
+    elif current_direction == "left":
+        x -= space_size
+
+    snake.coordinates.insert(0, (x, y))
+    square = play_canvas.create_rectangle(x, y, x + space_size, y + space_size, fill=snake_color)
+    snake.squares.insert(0, square)
+
+    if x == food.coordinates[0] and y == food.coordinates[1]:
+        global score
+        play_canvas.delete("food")
+        food = Food(snake)
+        while food.coordinates in snake.coordinates:
+            play_canvas.delete("food")
+            food = Food(snake)
+
+        score += 1
+        score_label.config(text=f"score: {score}")
+
+        if score > high_score:
+            high_score = score
+            highscore_label.config(text=f"Highest Score: {high_score}")
+
+    else:
+        del snake.coordinates[-1]
+        play_canvas.delete(snake.squares[-1])
+        del snake.squares[-1]
+
+    if check_collisions(snake):
+        game_over()
+
+    else:
+        window.after(speed, next_turn, snake, food)
+
+
+def change_direction(new_direction):
+    global current_direction, last_change_time
+    if last_change_time + (speed/1000) < time.time():
+        if new_direction == "up" and current_direction != "down":
+            current_direction = new_direction
+            last_change_time = time.time()
+
+        elif new_direction == "down" and current_direction != "up":
+            current_direction = new_direction
+            last_change_time = time.time()
+
+        elif new_direction == "right" and current_direction != "left":
+            current_direction = new_direction
+            last_change_time = time.time()
+
+        elif new_direction == "left" and current_direction != "right":
+            current_direction = new_direction
+            last_change_time = time.time()
+
+
+def check_collisions(snake):
+    x, y = snake.coordinates[0]
+    if (x < 0 or x >= game_width) or (y < 0 or y >= game_height):
+        return True
+
+    else:
+        for body_part in snake.coordinates[1:]:
+            if (x, y) == body_part:
+                return True
+        return False
+
+
+def game_over():
+    retry_button.place(x=0, y=0)
+    main_menu_button.place(x=0, y=0)
+    window.update_idletasks()
+
+    retry_button.place(x=(game_width-retry_button.winfo_width())//2,
+                       y=(game_height-retry_button.winfo_height())//2)
+
+    main_menu_button.place(x=0, y=0)
+    main_menu_button.place(x=(game_width-main_menu_button.winfo_width())//2,
+                           y=(game_height-retry_button.winfo_height()-main_menu_button.winfo_height())//2 + retry_button.winfo_height() + 70)
+
+
+def retry():
+    if retry_button.winfo_ismapped():
+        global food, snake, current_direction, score, games_played
+        retry_button.place_forget()
+        main_menu_button.place_forget()
+        play_canvas.delete(ALL)
+        current_direction = "down"
+        games_played += 1
+
+        food = None
+        food = Food(snake)
+
+        snake = None
+        snake = Snake()
+
+        score = 0
+        score_label.config(text=f"score: {score}")
+
+        next_turn(snake, food)
+
+
+def main_menu_function():
+    global food, snake, play_canvas
+    play_canvas.pack_forget()
+    play_canvas.delete(ALL)
+    score_label.pack_forget()
+    retry_button.place_forget()
+    main_menu_button.place_forget()
+
+    main_menu_canvas.pack()
+    window.update()
+    play_button.pack()
+    highscore_label.pack()
+    games_played_label.config(text=f"Games Played: {games_played}")
+    games_played_label.pack()
+    main_menu_canvas.focus_set()
+
+    window.update()
+
+
+def play():
+    global snake, food, current_direction, score, games_played
+
+    play_button.pack_forget()
+    games_played_label.pack_forget()
+    highscore_label.pack_forget()
+    main_menu_canvas.pack_forget()
+    main_menu_canvas.delete(ALL)
+    current_direction = "down"
+    games_played += 1
+
+    play_canvas.focus_set()
+
+    score_label.pack(side=TOP)
+
+    food = None
+    food = Food(snake)
+
+    snake = None
+    snake = Snake()
+
+    score = 0
+    score_label.config(text=f"score: {score}")
+    play_canvas.pack()
+    next_turn(snake, food)
+
+
+window = Tk()
+window.title("Snake Game")
+window.resizable(False, False)
+
+screen_x = (window.winfo_screenwidth() - game_width) // 2
+screen_y = (window.winfo_screenheight() - game_height) // 2
+
+highscore_label = Label(window, text=f"Highest Score: {score}", font=("stiff", 32, "bold"))
+
+score_label = Label(window, text=f"Score: {score}", font=("david", 32))
+score_label.pack()
+
+play_canvas = Canvas(master=window, background=background_color,
+                     height=game_height, width=game_width)
+play_canvas.pack()
+
+main_menu_canvas = Canvas(master=window, bg=background_color,
+                          height=game_height, width=game_width)
+
+play_button = Button(main_menu_canvas, text="Play", fg="red", bg="#1f021d",
+                     command=play, border=True, borderwidth=5,
+                     font=("calibri", 35), padx=60)
+
+
+retry_button = Button(window, text="Retry", fg="red", bg="#1f021d",
+                      command=retry, border=True, borderwidth=5,
+                      font=("calibri", 35), padx=60)
+
+main_menu_button = Button(window, text="Main Menu", fg="red", bg="#1f021d",
+                          command=main_menu_function, border=True, borderwidth=5,
+                          font=("calibri", 35))
+
+games_played_label = Label(window, text=f"Games Played: {score}", font=("stiff", 32, "bold"))
+
+window.geometry(f"{game_width}x{game_height + 50}+{screen_x}+{screen_y-60}")
+
+window.bind("<Left>", lambda event: change_direction("left"))
+window.bind("<Right>", lambda event: change_direction("right"))
+window.bind("<Down>", lambda event: change_direction("down"))
+window.bind("<Up>", lambda event: change_direction("up"))
+
+window.bind("<a>", lambda event: change_direction("left"))
+window.bind("<d>", lambda event: change_direction("right"))
+window.bind("<s>", lambda event: change_direction("down"))
+window.bind("<w>", lambda event: change_direction("up"))
+
+window.bind("<space>", lambda event: retry())
+window.bind("<Return>", lambda event: retry())
+
+food = None
+snake = None
+
+
+def main():
+    global food, snake
+    snake = Snake()
+    food = Food(snake)
+
+    next_turn(snake, food)
+
+    window.mainloop()
+
+
+if __name__ == "__main__":
+    main()
